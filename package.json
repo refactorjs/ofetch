@@ -1,6 +1,6 @@
 {
     "name": "@refactorjs/ofetch",
-    "version": "0.1.1",
+    "version": "0.1.2",
     "description": "An extension to ohmyfetch/ofetch",
     "repository": {
         "type": "git",

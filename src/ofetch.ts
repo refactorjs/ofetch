@@ -6,7 +6,7 @@ class HttpInstance {
     #httpDefaults: any;
     interceptors: any;
 
-    constructor(defaults: any, instance?: $Fetch) {
+    constructor(defaults?: any, instance?: $Fetch) {
         this.#httpDefaults = {
             ...defaults
         }
@@ -205,7 +205,7 @@ const cleanParams = (obj) => {
     return cleanedObj;
 }
 
-export function createHttpInstance(options: Object, instance?: any): HttpInstance {
+export function createHttpInstance(options?: Object, instance?: any): HttpInstance {
     // Create new Fetch instance
     return new HttpInstance(options, instance)
 }
