@@ -1,0 +1,49 @@
+{
+    "name": "@refactorjs/ofetch",
+    "version": "0.1.1",
+    "description": "An extension to ohmyfetch/ofetch",
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/refactorjs/ofetch.git"
+    },
+    "license": "MIT",
+    "sideEffects": false,
+    "type": "module",
+    "exports": {
+        ".": {
+            "import": "./dist/index.mjs",
+            "require": "./dist/index.cjs"
+        }
+    },
+    "main": "./dist/index.cjs",
+    "module": "./dist/index.mjs",
+    "types": "./dist/index.d.ts",
+    "files": [
+        "dist"
+    ],
+    "scripts": {
+        "build": "unbuild",
+        "release": "standard-version && git push --follow-tags && npm publish"
+    },
+    "dependencies": {
+        "ohmyfetch": "^0.4.18"
+    },
+    "devDependencies": {
+        "@types/node": "^18.7.6",
+        "standard-version": "^9.5.0",
+        "typescript": "^4.7.4",
+        "unbuild": "^0.8.9"
+    },
+    "publishConfig": {
+        "access": "public"
+    },
+    "bugs": {
+        "url": "https://github.com/refactorjs/ofetch/issues"
+    },
+    "homepage": "https://github.com/refactorjs/ofetch#readme",
+    "keywords": [
+        "http",
+        "ohmyfetch",
+        "ofetch"
+    ]
+}
