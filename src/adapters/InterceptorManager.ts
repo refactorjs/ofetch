@@ -1,5 +1,7 @@
-export class InterceptorManager {
-    handlers: any
+import type { FetchInterceptorOptions } from '../types'
+
+export default class InterceptorManager<V> {
+    handlers: Array<any>
 
     constructor() {
         this.handlers = []
@@ -8,12 +10,12 @@ export class InterceptorManager {
     /**
      * Add a new interceptor to the stack
      *
-     * @param { Function } fulfilled The function to handle `then` for a `Promise`
-     * @param { Function } rejected The function to handle `reject` for a `Promise`
+     * @param { (value: V) => T | Promise<T> } fulfilled The function to handle `then` for a `Promise`
+     * @param { (error: any) => any } rejected The function to handle `reject` for a `Promise`
      *
-     * @return { Number } An ID used to remove interceptor later
+     * @return { number } An ID used to remove interceptor later
      */
-    use(fulfilled: Function, rejected: Function, options: any): number {
+    use<T = V>(fulfilled: (value: V) => T | Promise<T>, rejected: (error: any) => any, options: FetchInterceptorOptions): number {
         this.handlers.push({
             fulfilled,
             rejected,
@@ -27,7 +29,7 @@ export class InterceptorManager {
     /**
      * Remove an interceptor from the stack
      *
-     * @param { Number } id The ID that was returned by `use`
+     * @param { number } id The ID that was returned by `use`
      *
      * @returns { void }
      */
@@ -54,11 +56,11 @@ export class InterceptorManager {
      * This method is particularly useful for skipping over any
      * interceptors that may have become `null` calling `eject`.
      *
-     * @param { Function } fn The function to call for each interceptor
+     * @param { (fn: (handler: any) => void) } fn The function to call for each interceptor
      *
      * @returns { void }
      */
-    forEach(fn: Function): void {
+    forEach(fn: (handler: any) => void): void {
         this.handlers.forEach((handler: any) => {
             if (handler !== null) {
                 fn(handler);
