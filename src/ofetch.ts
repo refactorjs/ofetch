@@ -2,7 +2,7 @@ import type { FetchConfig, FetchInterceptorManager } from './types'
 import { $fetch as ohmyfetch, $Fetch, SearchParams } from 'ohmyfetch'
 import InterceptorManager from './adapters/InterceptorManager'
 
-class FetchInstance {
+export class FetchInstance {
     [key: string]: any;
 
     #$fetch: $Fetch;
