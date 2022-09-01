@@ -1,6 +1,7 @@
 import type { FetchConfig, FetchInterceptorManager } from './types'
 import { $fetch as ohmyfetch, $Fetch, SearchParams } from 'ohmyfetch'
 import InterceptorManager from './adapters/InterceptorManager'
+import { getCookie, getCookies } from './utils'
 
 export class FetchInstance {
     [key: string]: any;
@@ -13,9 +14,11 @@ export class FetchInstance {
         response: FetchInterceptorManager<Promise<any>>;
     };
 
-    constructor(config?: FetchConfig, instance = ohmyfetch) {
+    constructor(config: FetchConfig = {}, instance = ohmyfetch) {
         this.#configDefaults = {
             url: '',
+            xsrfCookieName: 'XSRF-TOKEN',
+            xsrfHeaderName: 'X-XSRF-TOKEN',
             ...config
         }
 
@@ -129,23 +132,34 @@ export class FetchInstance {
         const controller = new AbortController();
         const timeoutSignal = setTimeout(() => controller.abort(), config.timeout);
         const $fetchInstance = this.getFetch()
+        // add XSRF header to request
+        this.#addXSRFHeader(config)
 
         clearTimeout(timeoutSignal);
 
         if (config.raw) {
             return $fetchInstance.raw(config.url as RequestInfo | Request, {
-                method: config.method,
                 signal: controller.signal,
                 ...config
             })
         }
 
         return $fetchInstance(config.url as RequestInfo | Request, {
-            method: config.method,
             signal: controller.signal,
             ...config
         })
 
+    }
+
+    #addXSRFHeader(config: FetchConfig): FetchConfig {
+        const cookie = getCookie(config.xsrfCookieName as string)
+        const cookies = getCookies()
+
+        if (config.credentials === 'include' && cookies[config.xsrfCookieName as keyof typeof cookies]) {
+            (config.headers as any)[config.xsrfHeaderName as keyof typeof config.headers] = cookie
+        }
+
+        return config
     }
 
     getFetch(): $Fetch {

@@ -15,4 +15,6 @@ export interface FetchConfig extends Options {
     url?: any;
     timeout?: number;
     raw?: boolean;
+    xsrfCookieName?: string,
+    xsrfHeaderName?: string,
 }
