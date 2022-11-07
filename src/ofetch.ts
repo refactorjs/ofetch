@@ -150,13 +150,18 @@ export class FetchInstance {
         })
 
     }
-
+    
     #addXSRFHeader(config: FetchConfig): FetchConfig {
         const cookie = getCookie(config.xsrfCookieName as string)
         const cookies = getCookies()
 
         if (config.credentials === 'include' && cookies[config.xsrfCookieName as keyof typeof cookies]) {
-            (config.headers as any)[config.xsrfHeaderName as keyof typeof config.headers] = cookie
+            if (config.headers.constructor.name === 'Object') {
+              config.headers = new Headers(config.headers)
+            }
+            
+            // @see https://github.com/Teranode/nuxt-module-alternatives/issues/111
+            (config.headers as any).set(config.xsrfHeaderName as keyof typeof config.headers, decodeURIComponent(cookie));
         }
 
         return config
