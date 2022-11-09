@@ -1,11 +1,10 @@
-import type { FetchConfig, FetchInterceptorManager } from './types'
+import type { FetchConfig, FetchInterceptorManager, RequestInfo, MakeRequired } from './types'
 import { $fetch as ohmyfetch, $Fetch, SearchParams } from 'ohmyfetch'
 import InterceptorManager from './adapters/InterceptorManager'
 import { getCookie, getCookies } from './utils'
+import { defu } from 'defu'
 
 export class FetchInstance {
-    [key: string]: any;
-
     #$fetch: $Fetch;
     #configDefaults: FetchConfig;
 
@@ -16,7 +15,6 @@ export class FetchInstance {
 
     constructor(config: FetchConfig = {}, instance = ohmyfetch) {
         this.#configDefaults = {
-            url: '',
             xsrfCookieName: 'XSRF-TOKEN',
             xsrfHeaderName: 'X-XSRF-TOKEN',
             ...config
@@ -34,132 +32,148 @@ export class FetchInstance {
     #createMethods(): void {
         for (const method of ['get', 'head', 'delete', 'post', 'put', 'patch', 'options']) {
             Object.assign(this, {
-                ['$' + method]: async (request: any, options: FetchConfig): Promise<any> => {
-                    let config: FetchConfig = { ...this.getDefaults(), ...options }
-
-                    config.url = request;
-                    config.method = method
-
-                    if (config && config.params) {
-                        config.params = cleanParams(config.params)
-                    }
-
-                    const configURL = config.url instanceof Request ? request.url : config.url
-
-                    if (/^https?/.test(configURL)) {
-                        delete config.baseURL
-                    }
-
-                    const requestInterceptorChain: Array<any> = [];
-                    let synchronousRequestInterceptors = true;
-                    
-                    this.interceptors.request.forEach((interceptor: any) => {
-                        if (typeof interceptor.runWhen === 'function' && interceptor.runWhen(config) === false) {
-                            return;
-                        }
-
-                        synchronousRequestInterceptors = synchronousRequestInterceptors && interceptor.synchronous;
-                        requestInterceptorChain.unshift(interceptor.fulfilled, interceptor.rejected);
-                    });
-
-                    const responseInterceptorChain: Array<any> = [];
-                    this.interceptors.response.forEach((interceptor: any) => {
-
-                        responseInterceptorChain.push(interceptor.fulfilled, interceptor.rejected);
-                    });
-
-                    let promise: Promise<any>;
-                    let i = 0;
-                    let len: number;
-
-                    if (!synchronousRequestInterceptors) {
-                        const chain = [this.#dispatchRequest.bind(this), undefined]
-                        chain.unshift.apply(chain, requestInterceptorChain);
-                        chain.push.apply(chain, responseInterceptorChain);
-                        len = chain.length;
-
-                        promise = Promise.resolve(config);
-
-                        while (i < len) {
-                            promise = promise.then(chain[i++], chain[i++]);
-                        }
-
-                        return promise;
-                    }
-
-                    len = requestInterceptorChain.length;
-
-                    let newConfig = config;
-
-                    i = 0;
-
-                    while (i < len) {
-                        const onFulfilled = requestInterceptorChain[i++];
-                        const onRejected = requestInterceptorChain[i++];
-                        try {
-                            newConfig = await onFulfilled(newConfig);
-                        } catch (error) {
-                            onRejected.call(this, error);
-                            break;
-                        }
-                    }
-
-                    try {
-                        promise = this.#dispatchRequest.call(this, newConfig)
-                    } catch (error) {
-                        return Promise.reject(error);
-                    }
-
-                    i = 0;
-                    len = responseInterceptorChain.length;
-
-                    while (i < len) {
-                        promise = promise.then(responseInterceptorChain[i++], responseInterceptorChain[i++]);
-                    }
-
-                    return promise;
+                ['$' + method]: (request: RequestInfo, config?: FetchConfig) => {
+                    return typeof request === 'string' ? this.request(request, { ...config, method: method }) : this.request({ ...request, method: method })
                 },
-                [method]: (request: any, options: FetchConfig): any => {
-                    options = { ...options, raw: true }
-
-                    return this['$' + method](request, options)
+                [method]: (request: RequestInfo, config?: FetchConfig) => {
+                    return typeof request === 'string' ? this.request(request, { ...config, method: method, raw: true }) : this.request({ ...request, method: method, raw: true })
                 }
             })
         }
+    }
+
+    requestRaw(request: RequestInfo, config?: FetchConfig) {
+        return typeof request === 'string' ? this.request(request, { ...config, raw: true }) : this.request({ ...request, raw: true })
+    }
+
+    async request(request: RequestInfo, config?: FetchConfig) {
+        if (typeof request === 'string') {
+            config = config || {};
+            config.url = request;
+        } else {
+            config = request;
+        }
+
+        config = defu(config, this.#configDefaults) 
+
+        config.method = config.method?.toUpperCase()
+
+        if (config && config.params) {
+            config.params = cleanParams(config.params)
+        }
+
+        if (/^https?/.test(config.url)) {
+            delete config.baseURL
+        }
+
+        const requestInterceptorChain: Array<any> = [];
+        let synchronousRequestInterceptors = true;
+
+        this.interceptors.request.forEach((interceptor: any) => {
+            if (typeof interceptor.runWhen === 'function' && interceptor.runWhen(config) === false) {
+                return;
+            }
+
+            synchronousRequestInterceptors = synchronousRequestInterceptors && interceptor.synchronous;
+            requestInterceptorChain.unshift(interceptor.fulfilled, interceptor.rejected);
+        });
+
+        const responseInterceptorChain: Array<any> = [];
+        this.interceptors.response.forEach((interceptor: any) => {
+
+            responseInterceptorChain.push(interceptor.fulfilled, interceptor.rejected);
+        });
+
+        let promise: Promise<any>;
+        let i = 0;
+        let len: number;
+
+        if (!synchronousRequestInterceptors) {
+            const chain = [this.#dispatchRequest.bind(this), undefined]
+            chain.unshift.apply(chain, requestInterceptorChain);
+            chain.push.apply(chain, responseInterceptorChain);
+            len = chain.length;
+
+            promise = Promise.resolve(config);
+
+            while (i < len) {
+                promise = promise.then(chain[i++], chain[i++]);
+            }
+
+            return promise;
+        }
+
+        len = requestInterceptorChain.length;
+
+        let newConfig = config;
+
+        i = 0;
+
+        while (i < len) {
+            const onFulfilled = requestInterceptorChain[i++];
+            const onRejected = requestInterceptorChain[i++];
+            try {
+                newConfig = await onFulfilled(newConfig);
+            } catch (error) {
+                onRejected.call(this, error);
+                break;
+            }
+        }
+
+        try {
+            promise = this.#dispatchRequest.call(this, newConfig)
+        } catch (error) {
+            return Promise.reject(error);
+        }
+
+        i = 0;
+        len = responseInterceptorChain.length;
+
+        while (i < len) {
+            promise = promise.then(responseInterceptorChain[i++], responseInterceptorChain[i++]);
+        }
+
+        return promise;
     }
 
     #dispatchRequest(config: FetchConfig): Promise<any> {
         const controller = new AbortController();
         const timeoutSignal = setTimeout(() => controller.abort(), config.timeout);
         const $fetchInstance = this.getFetch()
+
         // add XSRF header to request
-        this.#addXSRFHeader(config)
+        config = this.#addXSRFHeader(config as MakeRequired<FetchConfig, 'headers'>)
 
         clearTimeout(timeoutSignal);
 
         if (config.raw) {
-            return $fetchInstance.raw(config.url as RequestInfo | Request, {
+            return $fetchInstance.raw(config.url, {
                 signal: controller.signal,
                 ...config
             })
         }
 
-        return $fetchInstance(config.url as RequestInfo | Request, {
+        return $fetchInstance(config.url, {
             signal: controller.signal,
             ...config
         })
 
     }
 
-    #addXSRFHeader(config: FetchConfig): FetchConfig {
+    #addXSRFHeader(config: MakeRequired<FetchConfig, 'headers'>): FetchConfig {
         const cookie = getCookie(config.xsrfCookieName as string)
         const cookies = getCookies()
 
-        if (config.credentials === 'include' && cookies[config.xsrfCookieName as keyof typeof cookies]) {
-            (config.headers as any)[config.xsrfHeaderName as keyof typeof config.headers] = cookie
+        if (config.credentials === 'include' && config.xsrfCookieName && cookies[config.xsrfCookieName]) {
+            if (config.headers.constructor.name === 'Object') {
+                config.headers = new Headers(config.headers)
+            }
+  
+            // @see https://github.com/Teranode/nuxt-module-alternatives/issues/111
+            config.headers.set(config.xsrfHeaderName as string, decodeURIComponent(cookie));
         }
 
-        return config
+        return config as FetchConfig
     }
 
     getFetch(): $Fetch {
@@ -212,6 +226,23 @@ export class FetchInstance {
     create(options: FetchConfig): FetchInstance {
         return createInstance({ ...this.getDefaults(), ...options })
     }
+}
+
+export declare interface FetchInstance {
+    $get(request: RequestInfo, config: FetchConfig): any
+    $head(request: RequestInfo, config: FetchConfig): any
+    $delete(request: RequestInfo, config: FetchConfig): any
+    $post(request: RequestInfo, config: FetchConfig): any
+    $put(request: RequestInfo, config: FetchConfig): any
+    $patch(request: RequestInfo, config: FetchConfig): any
+    $options(request: RequestInfo, config: FetchConfig): any
+    get(request: RequestInfo, config: FetchConfig): any
+    head(request: RequestInfo, config: FetchConfig): any
+    delete(request: RequestInfo, config: FetchConfig): any
+    post(request: RequestInfo, config: FetchConfig): any
+    put(request: RequestInfo, config: FetchConfig): any
+    patch(request: RequestInfo, config: FetchConfig): any
+    options(request: RequestInfo, config: FetchConfig): any
 }
 
 const cleanParams = (params: SearchParams) => {
