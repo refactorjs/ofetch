@@ -1,5 +1,5 @@
 import type { FetchConfig, FetchInterceptorManager, RequestInfo, MakeRequired } from './types'
-import { $fetch as ohmyfetch, $Fetch, SearchParams } from 'ohmyfetch'
+import { $fetch as ofetch, $Fetch, SearchParameters, FetchResponse } from 'ofetch'
 import InterceptorManager from './adapters/InterceptorManager'
 import { getCookie, getCookies } from './utils'
 import { defu } from 'defu'
@@ -13,7 +13,7 @@ export class FetchInstance {
         response: FetchInterceptorManager<Promise<any>>;
     };
 
-    constructor(config: FetchConfig = {}, instance = ohmyfetch) {
+    constructor(config: FetchConfig = {}, instance = ofetch) {
         this.#configDefaults = {
             xsrfCookieName: 'XSRF-TOKEN',
             xsrfHeaderName: 'X-XSRF-TOKEN',
@@ -36,17 +36,21 @@ export class FetchInstance {
                     return typeof request === 'string' ? this.request(request, { ...config, method: method }) : this.request({ ...request, method: method })
                 },
                 [method]: (request: RequestInfo, config?: FetchConfig) => {
-                    return typeof request === 'string' ? this.request(request, { ...config, method: method, raw: true }) : this.request({ ...request, method: method, raw: true })
+                    return typeof request === 'string' ? this.raw(request, { ...config, method: method }) : this.raw({ ...request, method: method })
                 }
             })
         }
     }
 
-    requestRaw(request: RequestInfo, config?: FetchConfig) {
+    async native(request: RequestInfo, config?: FetchConfig): Promise<Response> {
+        return typeof request === 'string' ? this.request(request, { ...config, native: true }) : this.request({ ...request, native: true })
+    }
+
+    async raw(request: RequestInfo, config?: FetchConfig): Promise<FetchResponse<any>> {
         return typeof request === 'string' ? this.request(request, { ...config, raw: true }) : this.request({ ...request, raw: true })
     }
 
-    async request(request: RequestInfo, config?: FetchConfig) {
+    async request(request: RequestInfo, config?: FetchConfig): Promise<FetchResponse<any> | any> {
         if (typeof request === 'string') {
             config = config || {};
             config.url = request;
@@ -58,8 +62,8 @@ export class FetchInstance {
 
         config.method = config.method?.toUpperCase()
 
-        if (config && config.params) {
-            config.params = cleanParams(config.params)
+        if (config.params || config.query) {
+            config.query = config.params = config.params ? cleanParams(config.params as SearchParameters) : cleanParams(config.query as SearchParameters)
         }
 
         if (/^https?/.test(config.url)) {
@@ -136,24 +140,31 @@ export class FetchInstance {
         return promise;
     }
 
-    #dispatchRequest(config: FetchConfig): Promise<any> {
+    #dispatchRequest(config: FetchConfig): Promise<FetchResponse<any> | any> {
         const controller = new AbortController();
         const timeoutSignal = setTimeout(() => controller.abort(), config.timeout);
-        const $fetchInstance = this.getFetch()
+        const $ofetch = this.getFetch()
 
         // add XSRF header to request
         config = this.#addXSRFHeader(config as MakeRequired<FetchConfig, 'headers'>)
 
         clearTimeout(timeoutSignal);
 
+        if (config.native) {
+            return fetch(config.url, {
+                signal: controller.signal,
+                ...config as RequestInit
+            })
+        }
+
         if (config.raw) {
-            return $fetchInstance.raw(config.url, {
+            return $ofetch.raw(config.url, {
                 signal: controller.signal,
                 ...config
             })
         }
 
-        return $fetchInstance(config.url, {
+        return $ofetch(config.url, {
             signal: controller.signal,
             ...config
         })
@@ -165,12 +176,7 @@ export class FetchInstance {
         const cookies = getCookies()
 
         if (config.credentials === 'include' && config.xsrfCookieName && cookies[config.xsrfCookieName]) {
-            if (config.headers.constructor.name === 'Object') {
-                config.headers = new Headers(config.headers)
-            }
-  
-            // @see https://github.com/Teranode/nuxt-module-alternatives/issues/111
-            config.headers.set(config.xsrfHeaderName as string, decodeURIComponent(cookie));
+            config.headers[config.xsrfHeaderName as keyof HeadersInit] = decodeURIComponent(cookie)
         }
 
         return config as FetchConfig
@@ -193,12 +199,12 @@ export class FetchInstance {
     }
 
     setHeader(name: string, value: string | null): void {
-        this.#configDefaults.headers = this.#configDefaults?.headers ? new Headers(this.#configDefaults.headers) : new Headers()
+        this.#configDefaults.headers = this.#configDefaults?.headers ? { ...this.#configDefaults.headers } : {}
 
         if (!value) {
-            this.#configDefaults.headers.delete(name);
+            delete this.#configDefaults.headers[name as keyof HeadersInit]
         } else {
-            this.#configDefaults.headers.set(name, value)
+            this.#configDefaults.headers[name as keyof HeadersInit] = value
         }
     }
 
@@ -229,23 +235,23 @@ export class FetchInstance {
 }
 
 export declare interface FetchInstance {
-    $get(request: RequestInfo, config: FetchConfig): any
-    $head(request: RequestInfo, config: FetchConfig): any
-    $delete(request: RequestInfo, config: FetchConfig): any
-    $post(request: RequestInfo, config: FetchConfig): any
-    $put(request: RequestInfo, config: FetchConfig): any
-    $patch(request: RequestInfo, config: FetchConfig): any
-    $options(request: RequestInfo, config: FetchConfig): any
-    get(request: RequestInfo, config: FetchConfig): any
-    head(request: RequestInfo, config: FetchConfig): any
-    delete(request: RequestInfo, config: FetchConfig): any
-    post(request: RequestInfo, config: FetchConfig): any
-    put(request: RequestInfo, config: FetchConfig): any
-    patch(request: RequestInfo, config: FetchConfig): any
-    options(request: RequestInfo, config: FetchConfig): any
+    $get(request: RequestInfo, config?: FetchConfig): Promise<any>
+    $head(request: RequestInfo, config?: FetchConfig): Promise<any>
+    $delete(request: RequestInfo, config?: FetchConfig): Promise<any>
+    $post(request: RequestInfo, config?: FetchConfig): Promise<any>
+    $put(request: RequestInfo, config?: FetchConfig): Promise<any>
+    $patch(request: RequestInfo, config?: FetchConfig): Promise<any>
+    $options(request: RequestInfo, config?: FetchConfig): Promise<any>
+    get(request: RequestInfo, config?: FetchConfig): Promise<FetchResponse<any>>
+    head(request: RequestInfo, config?: FetchConfig): Promise<FetchResponse<any>>
+    delete(request: RequestInfo, config?: FetchConfig): Promise<FetchResponse<any>>
+    post(request: RequestInfo, config?: FetchConfig): Promise<FetchResponse<any>>
+    put(request: RequestInfo, config?: FetchConfig): Promise<FetchResponse<any>>
+    patch(request: RequestInfo, config?: FetchConfig): Promise<FetchResponse<any>>
+    options(request: RequestInfo, config?: FetchConfig): Promise<FetchResponse<any>>
 }
 
-const cleanParams = (params: SearchParams) => {
+const cleanParams = (params: SearchParameters) => {
     const cleanValues = [null, undefined, '']
     const cleanedParams = { ...params };
     Object.keys(cleanedParams).forEach(key => {

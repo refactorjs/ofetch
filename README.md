@@ -1,2 +1,2 @@
 # ofetch
-(Preemptive Naming) Extension to ohmyfetch to work somewhat like axios
+(Preemptive Naming) Extension to ofetch to work somewhat like axios

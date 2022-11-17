@@ -4,11 +4,11 @@
         "module": "ESNext",
         "moduleResolution": "Node",
         "esModuleInterop": true,
+        "outDir": "dist",
         "strict": true,
         "declaration": true,
-        "outDir": "./dist",
         "types": [
-            "node"
+          "node"
         ]
     },
     "include": [

@@ -1,4 +1,4 @@
-import type { FetchOptions as Options } from 'ohmyfetch'
+import type { FetchOptions as Options } from 'ofetch'
 
 export type RequestInfo = string | FetchConfig
 
@@ -20,7 +20,7 @@ export interface FetchConfig extends Options {
     url?: any;
     timeout?: number;
     raw?: boolean;
+    native?: boolean;
     xsrfCookieName?: string;
     xsrfHeaderName?: string;
-    headers?: Headers
 }
