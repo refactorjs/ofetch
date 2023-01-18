@@ -1,6 +1,6 @@
 {
     "name": "@refactorjs/ofetch",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "description": "An extension to ofetch",
     "repository": {
         "type": "git",
@@ -26,10 +26,10 @@
         "release": "standard-version && git push --follow-tags && npm publish"
     },
     "dependencies": {
-        "ofetch": "latest",
         "cookie-es": "latest",
+        "defu": "latest",
         "destr": "latest",
-        "defu": "latest"
+        "ofetch": "latest"
     },
     "devDependencies": {
         "@types/node": "^18.11.9",

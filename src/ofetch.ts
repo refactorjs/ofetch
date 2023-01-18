@@ -63,7 +63,7 @@ export class FetchInstance {
         config.method = config.method?.toUpperCase()
 
         if (config.params || config.query) {
-            config.query = config.params = config.params ? cleanParams(config.params as SearchParameters) : cleanParams(config.query as SearchParameters)
+            config.query = config.params = serializeQuery(config.query || config.params as SearchParameters)
         }
 
         if (/^https?/.test(config.url)) {
@@ -251,16 +251,24 @@ export declare interface FetchInstance {
     options(request: RequestInfo, config?: FetchConfig): Promise<FetchResponse<any>>
 }
 
-const cleanParams = (params: SearchParameters) => {
-    const cleanValues = [null, undefined, '']
-    const cleanedParams = { ...params };
-    Object.keys(cleanedParams).forEach(key => {
-        if (cleanValues.includes(cleanedParams[key]) || (Array.isArray(cleanedParams[key]) && !cleanedParams[key].length)) {
-            delete cleanedParams[key];
+function serializeQuery(params: SearchParameters) {
+    const clean = [null, undefined, '']
+
+    Object.keys(params).forEach(key => {
+        if (clean.includes(params[key]) || (Array.isArray(params[key]) && !params[key].length)) {
+            delete params[key];
         }
     });
 
-    return cleanedParams;
+    const queries = Object.fromEntries(Object.entries(params).map(([key, value]) => {
+        if (Array.isArray(value)) {
+            return [`${key}[]`, value]
+        }
+
+        return [key, value]
+    }))
+
+    return queries
 }
 
 export function createInstance(config?: FetchConfig, instance?: $Fetch): FetchInstance {
