@@ -58,13 +58,9 @@ export class FetchInstance {
             config = request;
         }
 
-        config = defu(config, this.#configDefaults) 
+        config = defu(config, this.#configDefaults)
 
         config.method = config.method?.toUpperCase()
-
-        if (config.params || config.query) {
-            config.query = config.params = serializeQuery(config.query || config.params as SearchParameters)
-        }
 
         if (/^https?/.test(config.url)) {
             delete config.baseURL
@@ -147,6 +143,10 @@ export class FetchInstance {
 
         // add XSRF header to request
         config = this.#addXSRFHeader(config as MakeRequired<FetchConfig, 'headers'>)
+
+        if (config.params || config.query) {
+            config.query = config.params = serializeQuery(config.query || config.params as SearchParameters)
+        }
 
         clearTimeout(timeoutSignal);
 
