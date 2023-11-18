@@ -60,7 +60,8 @@ export class FetchInstance {
 
         config = defu(config, this.#configDefaults)
 
-        config.method = config.method?.toUpperCase()
+        // uppercase method
+        config.method = config.method ? config.method.toUpperCase() : 'GET'
 
         if (/^https?/.test(config.url)) {
             delete config.baseURL
@@ -141,11 +142,20 @@ export class FetchInstance {
         const timeoutSignal = setTimeout(() => controller.abort(), config.timeout);
         const $ofetch = this.getFetch()
 
-        // add XSRF header to request
-        config = this.#addXSRFHeader(config as MakeRequired<FetchConfig, 'headers'>)
+        if (typeof window !== 'undefined') {
+            // add XSRF header to request
+            config = this.#addXSRFHeader(config as MakeRequired<FetchConfig, 'headers'>)
+        }
 
-        if (config.params || config.query) {
-            config.query = config.params = serializeQuery(config.query || config.params as SearchParameters)
+        // uppercase method
+        config.method = config.method ? config.method.toUpperCase() : 'GET'
+
+        if (config.params) {
+            config.params = serializeQuery(config.params)
+        }
+
+        if (config.query) {
+            config.query = serializeQuery(config.query)
         }
 
         clearTimeout(timeoutSignal);
@@ -172,14 +182,20 @@ export class FetchInstance {
     }
 
     #addXSRFHeader(config: MakeRequired<FetchConfig, 'headers'>): FetchConfig {
+        const absoluteUrl = new URL(config.url, window.location.href).href;
+
+        if (absoluteUrl.split('#')[0] !== window.location.href.split('#')[0]) {
+            return config;
+        }
+
         const cookie = getCookie(config.xsrfCookieName as string)
         const cookies = getCookies()
-
+    
         if (config.credentials === 'include' && config.xsrfCookieName && cookies[config.xsrfCookieName]) {
             config.headers[config.xsrfHeaderName as keyof HeadersInit] = decodeURIComponent(cookie)
         }
-
-        return config as FetchConfig
+    
+        return config
     }
 
     getFetch(): $Fetch {
@@ -213,7 +229,7 @@ export class FetchInstance {
         this.setHeader('Authorization', value)
     }
 
-    onRequest(fn: (config: FetchConfig) => number): void {
+    onRequest(fn: (config: FetchConfig) => any): void {
         this.interceptors.request.use((config: FetchConfig) => fn(config) || config)
     }
 
@@ -253,22 +269,26 @@ export declare interface FetchInstance {
 
 function serializeQuery(params: SearchParameters) {
     const clean = [null, undefined, '']
+    if (params) {
+        Object.keys(params).forEach(key => {
+            if (clean.includes(params[key]) || (Array.isArray(params[key]) && !params[key].length)) {
+                delete params[key];
+            }
+        });
+    
+        const queries = Object.fromEntries(Object.entries(params).map(([key, value]) => {
+            if (Array.isArray(value)) {
+                const uniqueArray = [...new Set(value)]
+                return [`${key}[]`, uniqueArray]
+            }
+    
+            return [key, value]
+        }))
+    
+        return queries
+    }
 
-    Object.keys(params).forEach(key => {
-        if (clean.includes(params[key]) || (Array.isArray(params[key]) && !params[key].length)) {
-            delete params[key];
-        }
-    });
-
-    const queries = Object.fromEntries(Object.entries(params).map(([key, value]) => {
-        if (Array.isArray(value)) {
-            return [`${key}[]`, value]
-        }
-
-        return [key, value]
-    }))
-
-    return queries
+    return {}
 }
 
 export function createInstance(config?: FetchConfig, instance?: $Fetch): FetchInstance {
