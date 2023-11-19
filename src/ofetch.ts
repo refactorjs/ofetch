@@ -1,5 +1,5 @@
 import type { FetchConfig, FetchInterceptorManager, RequestInfo, MakeRequired } from './types'
-import { $fetch as ofetch, $Fetch, SearchParameters, FetchResponse } from 'ofetch'
+import { $fetch as ofetch, type $Fetch, type SearchParameters, type FetchResponse } from 'ofetch'
 import InterceptorManager from './adapters/InterceptorManager'
 import { getCookie, getCookies } from './utils'
 import { defu } from 'defu'
@@ -142,10 +142,8 @@ export class FetchInstance {
         const timeoutSignal = setTimeout(() => controller.abort(), config.timeout);
         const $ofetch = this.getFetch()
 
-        if (typeof window !== 'undefined') {
-            // add XSRF header to request
-            config = this.#addXSRFHeader(config as MakeRequired<FetchConfig, 'headers'>)
-        }
+        // add XSRF header to request
+        config = this.#addXSRFHeader(config as MakeRequired<FetchConfig, 'headers'>)
 
         // uppercase method
         config.method = config.method ? config.method.toUpperCase() : 'GET'
@@ -182,20 +180,14 @@ export class FetchInstance {
     }
 
     #addXSRFHeader(config: MakeRequired<FetchConfig, 'headers'>): FetchConfig {
-        const absoluteUrl = new URL(config.url, window.location.href).href;
-
-        if (absoluteUrl.split('#')[0] !== window.location.href.split('#')[0]) {
-            return config;
-        }
-
         const cookie = getCookie(config.xsrfCookieName as string)
         const cookies = getCookies()
-    
+
         if (config.credentials === 'include' && config.xsrfCookieName && cookies[config.xsrfCookieName]) {
             config.headers[config.xsrfHeaderName as keyof HeadersInit] = decodeURIComponent(cookie)
         }
-    
-        return config
+
+        return config as FetchConfig
     }
 
     getFetch(): $Fetch {
