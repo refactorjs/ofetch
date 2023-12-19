@@ -1,7 +1,7 @@
-import type { FetchInterceptorOptions } from '../types'
+import type { FetchInterceptorManager, FetchInterceptorOptions } from '../types'
 
-export default class InterceptorManager<V> {
-    handlers: Array<any>
+export default class InterceptorManager<V> implements FetchInterceptorManager<V> {
+    handlers: Array<FetchInterceptorOptions | null>;
 
     constructor() {
         this.handlers = []
@@ -10,17 +10,17 @@ export default class InterceptorManager<V> {
     /**
      * Add a new interceptor to the stack
      *
-     * @param { (value: V) => T | Promise<T> } fulfilled The function to handle `then` for a `Promise`
-     * @param { (error: any) => any } rejected The function to handle `reject` for a `Promise`
+     * @param { (value: V) => T | Promise<T> } onFulfilled The function to handle `then` for a `Promise`
+     * @param { (error: any) => any } onRejected The function to handle `reject` for a `Promise`
      *
      * @return { number } An ID used to remove interceptor later
      */
-    use<T = V>(fulfilled: (value: V) => T | Promise<T>, rejected: (error: any) => any, options: FetchInterceptorOptions): number {
+    use<T = V>(onFulfilled: (value: any) => T | Promise<T>, onRejected: (error: any) => any, options: Omit<FetchInterceptorOptions, 'onFulfilled' | 'onRejected'>): number {
         this.handlers.push({
-            fulfilled,
-            rejected,
+            onFulfilled,
+            onRejected,
             synchronous: options ? options.synchronous : false,
-            runWhen: options ? options.runWhen : null
+            runWhen: options ? options.runWhen : undefined
         });
 
         return this.handlers.length - 1;
@@ -60,8 +60,8 @@ export default class InterceptorManager<V> {
      *
      * @returns { void }
      */
-    forEach(fn: (handler: any) => void): void {
-        this.handlers.forEach((handler: any) => {
+    forEach(fn: (handler: FetchInterceptorOptions) => void): void {
+        this.handlers.forEach((handler) => {
             if (handler !== null) {
                 fn(handler);
             }

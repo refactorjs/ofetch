@@ -1,19 +1,19 @@
-import type { FetchConfig, FetchInterceptorManager, RequestInfo, MakeRequired } from './types'
-import { $fetch as ofetch, type $Fetch, type SearchParameters, type FetchResponse } from 'ofetch'
-import InterceptorManager from './adapters/InterceptorManager'
-import { getCookie, getCookies } from './utils'
-import { defu } from 'defu'
+import type { FetchConfig, FetchInterceptorManager, RequestInfo, MakeRequired } from './types';
+import { $fetch as ofetch, type $Fetch, type SearchParameters, type FetchResponse } from 'ofetch';
+import InterceptorManager from './adapters/InterceptorManager';
+import { getCookie, getCookies } from './utils';
+import { defu } from 'defu';
 
 export class FetchInstance {
     #$fetch: $Fetch;
     #configDefaults: FetchConfig;
 
     interceptors: {
-        request: FetchInterceptorManager<FetchConfig>
+        request: FetchInterceptorManager<FetchConfig>;
         response: FetchInterceptorManager<Promise<any>>;
     };
 
-    constructor(config: FetchConfig = {}, instance = ofetch) {
+    constructor(config: FetchConfig = {}) {
         this.#configDefaults = {
             xsrfCookieName: 'XSRF-TOKEN',
             xsrfHeaderName: 'X-XSRF-TOKEN',
@@ -25,7 +25,7 @@ export class FetchInstance {
             response: new InterceptorManager()
         }
 
-        this.#$fetch = instance
+        this.#$fetch = ofetch
         this.#createMethods()
     }
 
@@ -70,19 +70,19 @@ export class FetchInstance {
         const requestInterceptorChain: Array<any> = [];
         let synchronousRequestInterceptors = true;
 
-        this.interceptors.request.forEach((interceptor: any) => {
-            if (typeof interceptor.runWhen === 'function' && interceptor.runWhen(config) === false) {
+        this.interceptors.request.forEach((interceptor) => {
+            if (typeof interceptor.runWhen === 'function' && interceptor.runWhen(config as FetchConfig) === false) {
                 return;
             }
 
-            synchronousRequestInterceptors = synchronousRequestInterceptors && interceptor.synchronous;
-            requestInterceptorChain.unshift(interceptor.fulfilled, interceptor.rejected);
+            synchronousRequestInterceptors = synchronousRequestInterceptors && interceptor.synchronous as boolean;
+            requestInterceptorChain.unshift(interceptor.onFulfilled, interceptor.onRejected);
         });
 
         const responseInterceptorChain: Array<any> = [];
-        this.interceptors.response.forEach((interceptor: any) => {
+        this.interceptors.response.forEach((interceptor) => {
 
-            responseInterceptorChain.push(interceptor.fulfilled, interceptor.rejected);
+            responseInterceptorChain.push(interceptor.onFulfilled, interceptor.onRejected);
         });
 
         let promise: Promise<any>;
@@ -137,7 +137,7 @@ export class FetchInstance {
         return promise;
     }
 
-    #dispatchRequest(config: FetchConfig): Promise<FetchResponse<any> | any> {
+    async #dispatchRequest(config: FetchConfig): Promise<FetchResponse<any> | any> {
         const controller = new AbortController();
         const timeoutSignal = setTimeout(() => controller.abort(), config.timeout);
         const $ofetch = this.getFetch()
@@ -159,6 +159,7 @@ export class FetchInstance {
         clearTimeout(timeoutSignal);
 
         if (config.native) {
+            delete config.native
             return fetch(config.url, {
                 signal: controller.signal,
                 ...config as RequestInit
@@ -166,6 +167,7 @@ export class FetchInstance {
         }
 
         if (config.raw) {
+            delete config.raw
             return $ofetch.raw(config.url, {
                 signal: controller.signal,
                 ...config
@@ -283,9 +285,9 @@ function serializeQuery(params: SearchParameters) {
     return {}
 }
 
-export function createInstance(config?: FetchConfig, instance?: $Fetch): FetchInstance {
+export function createInstance(config?: FetchConfig): FetchInstance {
     // Create new Fetch instance
-    return new FetchInstance(config, instance)
+    return new FetchInstance(config)
 }
 
 export const $fetch = createInstance

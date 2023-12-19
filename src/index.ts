@@ -1,2 +1,2 @@
-export * from './ofetch'
-export * from './types'
+export * from './ofetch';
+export * from './types';
